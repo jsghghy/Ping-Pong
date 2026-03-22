@@ -1,6 +1,7 @@
 from pygame import *
 import json
 import os
+from Ping_Pong import start_game
 
 window_size = 600, 400
 window = display.set_mode(window_size)
@@ -61,7 +62,8 @@ while running:
        if e.type == QUIT:
            running = False
        if play_button.is_clicked(e):
-           print("Гра запускається зі складністю:", difficulties[current_index])
+           start_game()
+           window = display.set_mode(window_size)
        if settings_button.is_clicked(e):
            current_index = (current_index + 1) % len(difficulties)
            with open(filename, "w") as f:
