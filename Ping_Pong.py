@@ -1,21 +1,33 @@
 import pygame
 import random
 import sys
-import random
 
-def start_game():
+
+def start_game(difficulty_name="легкий"):
     pygame.init()
 
     SCREEN_WIDTH = 900
     SCREEN_HEIGHT = 600
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Ping Pong")
+    pygame.display.set_caption(f"Ping Pong - {difficulty_name}")
+
+    if difficulty_name == "легкий":
+        BOT_ERROR_MARGIN = 70
+        BOT_REACTION_SPEED = 0.6
+        MAX_BALL_SPEED = 15
+    elif difficulty_name == "середній":
+        BOT_ERROR_MARGIN = 30
+        BOT_REACTION_SPEED = 0.85
+        MAX_BALL_SPEED = 25
+    else:  # важкий
+        BOT_ERROR_MARGIN = 5
+        BOT_REACTION_SPEED = 1.1
+        MAX_BALL_SPEED = 40
 
     PLATFORM_WIDTH = 20
     PLATFORM_HEIGHT = 160
-    PLATFORM_SPEED = 5
     BALL_SIZE = 30
-    MAX_BALL_SPEED = 50
+    PLAYER_SPEED = 7
 
     font_obj = pygame.font.SysFont("Comic Sans MS", 50)
 
@@ -23,9 +35,11 @@ def start_game():
     player2 = pygame.Rect(SCREEN_WIDTH - 50 - PLATFORM_WIDTH, SCREEN_HEIGHT // 2 - PLATFORM_HEIGHT // 2, PLATFORM_WIDTH,
                           PLATFORM_HEIGHT)
     ball = pygame.Rect(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, BALL_SIZE, BALL_SIZE)
+
     pygame.mixer.music.load("assets/Virus.mp3")
     pygame.mixer.music.play(-1)
     pygame.mixer.music.set_volume(0.5)
+
     ball_sx = 0
     ball_sy = 0
     ball_angle = 0
@@ -35,22 +49,19 @@ def start_game():
     plat_img = pygame.transform.scale(pygame.image.load("assets/Platform.jpg").convert_alpha(),
                                       (PLATFORM_WIDTH, PLATFORM_HEIGHT))
     ball_original = pygame.transform.scale(pygame.image.load("assets/ball.png").convert_alpha(), (BALL_SIZE, BALL_SIZE))
-    bg = pygame.image.load("assets/bg.png").convert_alpha()
-    bg = pygame.transform.scale(bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    bg = pygame.transform.scale(pygame.image.load("assets/bg.png").convert_alpha(), (SCREEN_WIDTH, SCREEN_HEIGHT))
 
     ball_bounce_sound = pygame.mixer.Sound("assets/BounceYoFrankie.flac")
-    ball_bounce_sound2 = pygame.mixer.Sound("assets/qubodup-cfork-ccby3-jump.ogg")
 
     def reset_ball():
-        nonlocal ball_sx, ball_sy, turn
-        turn = 0
+        nonlocal ball_sx, ball_sy
         ball.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        ball_sx = random.choice([-10, 10])
+        ball_sx = random.choice([-7, 7])
         ball_sy = random.uniform(-4, 4)
-#opengame.org
+
     reset_ball()
     clock = pygame.time.Clock()
-    turn = 0
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -59,38 +70,26 @@ def start_game():
 
         keys = pygame.key.get_pressed()
 
-        dynamic_speed = abs(ball_sx) * 1.3
+        if keys[pygame.K_w] and player1.top > 0:
+            player1.y -= PLAYER_SPEED
+        if keys[pygame.K_s] and player1.bottom < SCREEN_HEIGHT:
+            player1.y += PLAYER_SPEED
 
-        if turn != 2:
-            if abs(player1.centery - ball.centery) > dynamic_speed:
-                if player1.centery > ball.centery:
-                    player1.y -= dynamic_speed
-                else:
-                    player1.y += dynamic_speed
-            else:
-                player1.centery = ball.centery
+        target_y = ball.centery + (random.uniform(-BOT_ERROR_MARGIN, BOT_ERROR_MARGIN) if random.random() > 0.9 else 0)
 
-        if turn != 1:
-            if abs(player2.centery - ball.centery) > dynamic_speed:
-                if player2.centery > ball.centery:
-                    player2.y -= dynamic_speed
-                else:
-                    player2.y += dynamic_speed
-            else:
-                player2.centery = ball.centery
+        bot_speed = abs(ball_sx) * BOT_REACTION_SPEED
+
+        if player2.centery < target_y:
+            player2.y += bot_speed
+        elif player2.centery > target_y:
+            player2.y -= bot_speed
 
         player1.y = max(0, min(SCREEN_HEIGHT - PLATFORM_HEIGHT, player1.y))
         player2.y = max(0, min(SCREEN_HEIGHT - PLATFORM_HEIGHT, player2.y))
 
-        """
-        if keys[pygame.K_UP] and player2.top > 0:
-            player2.y -= PLATFORM_SPEED
-        if keys[pygame.K_DOWN] and player2.bottom < SCREEN_HEIGHT:
-            player2.y += PLATFORM_SPEED
-        """
+        # Движение мяча
         ball.x += ball_sx
         ball.y += ball_sy
-
         ball_angle -= ball_sx * 2
 
         if ball.top <= 0 or ball.bottom >= SCREEN_HEIGHT:
@@ -98,29 +97,19 @@ def start_game():
             ball_bounce_sound.play()
 
         if ball.colliderect(player1):
-            if abs(ball_sx) < MAX_BALL_SPEED:
-                ball_sx = abs(ball_sx) * 1.05
-            else:
-                ball_sx = abs(ball_sx)
-
-            relative_intersect_y = (player1.centery - (ball.centery+5)) / (PLATFORM_HEIGHT / 2)
+            ball_sx = min(abs(ball_sx) * 1.05, MAX_BALL_SPEED)
+            relative_intersect_y = (player1.centery - ball.centery) / (PLATFORM_HEIGHT / 2)
             ball_sy = -relative_intersect_y * abs(ball_sx)
-
             ball.left = player1.right
             ball_bounce_sound.play()
-            turn = 2
+
         if ball.colliderect(player2):
-            if abs(ball_sx) < MAX_BALL_SPEED:
-                ball_sx = -abs(ball_sx) * 1.05
-            else:
-                ball_sx = -abs(ball_sx)
-
-            relative_intersect_y = (player2.centery - (ball.centery+5)) / (PLATFORM_HEIGHT / 2)
+            ball_sx = -min(abs(ball_sx) * 1.05, MAX_BALL_SPEED)
+            relative_intersect_y = (player2.centery - ball.centery) / (PLATFORM_HEIGHT / 2)
             ball_sy = -relative_intersect_y * abs(ball_sx)
-
             ball.right = player2.left
             ball_bounce_sound.play()
-            turn = 1
+
         if ball.left < 0:
             score2 += 1
             reset_ball()
@@ -129,13 +118,10 @@ def start_game():
             reset_ball()
 
         screen.blit(bg, (0, 0))
-
         pygame.draw.line(screen, (0, 0, 0), (SCREEN_WIDTH // 2, 0), (SCREEN_WIDTH // 2, SCREEN_HEIGHT), 2)
 
         rotated_ball = pygame.transform.rotate(ball_original, ball_angle)
-        new_rect = rotated_ball.get_rect(center=ball.center)
-        screen.blit(rotated_ball, new_rect)
-
+        screen.blit(rotated_ball, rotated_ball.get_rect(center=ball.center))
         screen.blit(plat_img, player1)
         screen.blit(plat_img, player2)
 
@@ -144,7 +130,3 @@ def start_game():
 
         pygame.display.flip()
         clock.tick(60)
-
-
-if __name__ == "__main__":
-    start_game()
